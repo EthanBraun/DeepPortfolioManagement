@@ -6,6 +6,8 @@ from numpy.linalg import norm
 from scipy.optimize import *
 from math import isnan
 from random import random as rand 
+from keras.models import *
+from keras.layers import *
 
 # Simulated crypto portfolio
 class Portfolio():
@@ -23,6 +25,31 @@ class Portfolio():
 		self.values = [1.0]
 		self.noop = noop
 		self.failureChance = failureChance
+
+	def createEiieNet(self, inputTensor, mrpVector):
+		biasIn = np.ones(1)
+		mainInputShape = np.array(inputTensor).shape[1:]
+		weightInputShape = np.array(mrpVector).shape[1:]
+		biasInputShape = biasIn.shape
+		print('mainInputShape: ' + str(mainInputShape))
+		print('weightInputShape: ' + str(weightInputShape))
+		print('biasInputShape: ' + str(biasInputShape))
+		
+		mIn = Input(shape=mainInputShape, name='mainInput')
+		x = Conv1D(2, 3)(mIn)
+		x = Activation('relu')(x)
+		x = Conv1D(20, 48)(x)
+		x = Activation('relu')(x)
+		wIn = Input(shape=weightInputShape, name='weightInput') 
+		x = Concatenate()([x, wIn])
+		x = Conv1D(1, 1)(x)
+		bIn = Input(shape=biasInputShape, name='biasInput')
+		x = Concatenate()([x, bIn])
+		mOut = Activation('softmax')(x)
+	
+		model = Model([mIn, wIn, bIn], mOut) 
+		model.compile(loss='mse', optimizer='nadam')
+		self.model = model
 	
 	def printParams(self):
 		print('\nPortfolio parameters:')
@@ -270,7 +297,7 @@ for sym in symbols:
 	
 tData = truncateData(data)
 checkTruncData(tData)
-fData = formatData(tData, True)
+fData = formatData(tData, False)
 x, y = formatDataForInput(fData, window)
 
 
