@@ -36,15 +36,15 @@ class Portfolio():
 		print('biasInputShape: ' + str(biasInputShape))
 		
 		mIn = Input(shape=mainInputShape, name='mainInput')
-		x = Conv1D(2, 3)(mIn)
+		x = Conv2D(2, (3, 1))(mIn)
 		x = Activation('relu')(x)
-		x = Conv1D(20, 48)(x)
+		x = Conv2D(20, (48, 1))(x)
 		x = Activation('relu')(x)
 		wIn = Input(shape=weightInputShape, name='weightInput') 
 		x = Concatenate()([x, wIn])
-		x = Conv1D(1, 1)(x)
+		x = Conv2D(1, (1, 1))(x)
 		bIn = Input(shape=biasInputShape, name='biasInput')
-		x = Concatenate()([x, bIn])
+		x = Concatenate(axis=2)([x, bIn])
 		mOut = Activation('softmax')(x)
 	
 		model = Model([mIn, wIn, bIn], mOut) 
@@ -266,7 +266,8 @@ binance.load_markets()
 #symbols = ['DENT/BTC', 'ETH/BTC', 'ETC/BTC', 'EOS/BTC', 'MFT/BTC', 'KEY/BTC', 'NPXS/BTC', 'NEO/BTC', 'ICX/BTC', 'QKC/BTC', 'XRP/BTC', 'LOOM/BTC', 'ONT/BTC', 'ADA/BTC']
 
 #symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XLM/BTC', 'NEO/BTC', 'LTC/BTC', 'ADA/BTC']
-symbols = ['EOS/BTC', 'ETH/BTC']
+symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'XRP/BTC', 'NEO/BTC','ADA/BTC']
+#symbols = ['EOS/BTC', 'ETH/BTC']
 
 #symbols = ['ETH/BTC', 'XRP/BTC', 'XLM/BTC', 'ADA/BTC', 'NEO/BTC', 'XMR/BTC', 'XEM/BTC', 'EOS/BTC', 'ICX/BTC', 'LTC/BTC', 'QTUM/BTC', 'VEN/BTC', 'NAV/BTC', 'BQX/BTC']
 #symbols = ['TRX/BTC', 'ETC/BTC', 'BCH/BTC', 'IOTA/BTC', 'ZRX/BTC', 'WAN/BTC', 'WAVES/BTC', 'SNT/BTC', 'MCO/BTC', 'DASH/BTC', 'ELF/BTC', 'AION/BTC', 'STRAT/BTC', 'XVG/BTC', 'EDO/BTC', 'IOST/BTC', 'WABI/BTC', 'SUB/BTC', 'OMG/BTC', 'WTC/BTC', 'LSK/BTC', 'ZEC/BTC', 'STEEM/BTC', 'QSP/BTC', 'SALT/BTC', 'ETH/BTC', 'XRP/BTC', 'XLM/BTC', 'ADA/BTC', 'NEO/BTC', 'XMR/BTC', 'XEM/BTC', 'EOS/BTC', 'ICX/BTC', 'LTC/BTC', 'QTUM/BTC', 'VEN/BTC', 'NAV/BTC', 'BQX/BTC']
@@ -308,6 +309,9 @@ if holdBtc:
 print('\n\nx shape: ' + str(np.array(x).shape))
 print('y shape: ' + str(np.array(y).shape))
 b = [1 / float(len(symbols))] * len(symbols)
+
+port = Portfolio(symbols, 0.25, 9, 30, b)
+port.createEiieNet(x, y)
 
 """
 # Initialize simulated portfolio
