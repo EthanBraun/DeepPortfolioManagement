@@ -8,6 +8,14 @@ from math import isnan
 from random import random as rand 
 from keras.models import *
 from keras.layers import *
+import keras.backend as K
+
+
+def expandDims(x):
+	expX = K.expand_dims(x, axis=1)	
+	expX = K.expand_dims(expX, axis=1)
+	return expX
+
 
 # Simulated crypto portfolio
 class Portfolio():
@@ -41,10 +49,12 @@ class Portfolio():
 		x = Conv2D(20, (48, 1))(x)
 		x = Activation('relu')(x)
 		wIn = Input(shape=weightInputShape, name='weightInput') 
-		x = Concatenate()([x, wIn])
+		wInExp = Lambda(expandDims)(wIn)
+		x = Concatenate(axis=1)([x, wInExp])
 		x = Conv2D(1, (1, 1))(x)
 		bIn = Input(shape=biasInputShape, name='biasInput')
-		x = Concatenate(axis=2)([x, bIn])
+		bInExp = Lambda(expandDims)(bIn)
+		x = Concatenate(axis=3)([x, bInExp])
 		mOut = Activation('softmax')(x)
 	
 		model = Model([mIn, wIn, bIn], mOut) 
