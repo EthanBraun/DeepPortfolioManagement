@@ -121,6 +121,22 @@ class Portfolio():
 	
 		self.setWeights(np.divide(newValues, newValue))
 
+
+	# Iteratively calculate the transaction remainder factor for the period
+	def calculateMu(self, wPrime, w, k):
+		# Calculate initial mu value
+		mu = self.tradeFee * sum([abs(wpI - wI) for wpI, wI in zip(wPrime, w)]) 	
+
+		# Calculate iteration of mu
+		for i in range(k):
+			muSuffix = sum([(wpI - mu * wI) if ((wpI - mu * wI) > 0) else 0 for wpI, wI in zip(wPrime, w)])
+			mu = (1. / (1. - self.tradeFee * w[0])) * (1. - (self.tradeFee * wPrime[0]) - (2 * self.tradeFee - (self.tradeFee ** 2)) * muSuffix)
+		return mu
+
+
+
+
+
 	# Simulate the pamr agent over a set of data and return the final portfolio value
 	def simulate(self, fData):	
 		x = [1. for i in symbols]
@@ -322,6 +338,9 @@ b = [1 / float(len(symbols))] * len(symbols)
 
 port = Portfolio(symbols, 0.25, 9, 30, b)
 port.createEiieNet(x, y)
+
+print('\n' + str(port.model.summary()))
+
 
 """
 # Initialize simulated portfolio
