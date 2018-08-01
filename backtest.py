@@ -129,7 +129,7 @@ class Portfolio():
 
 		# Calculate iteration of mu
 		for i in range(k):
-			muSuffix = sum([(wpI - mu * wI) if ((wpI - mu * wI) > 0) else 0 for wpI, wI in zip(wPrime, w)])
+			muSuffix = sum([max((wpI - mu * wI), 0) for wpI, wI in zip(wPrime, w)])
 			mu = (1. / (1. - self.tradeFee * w[0])) * (1. - (self.tradeFee * wPrime[0]) - (2 * self.tradeFee - (self.tradeFee ** 2)) * muSuffix)
 		return mu
 
