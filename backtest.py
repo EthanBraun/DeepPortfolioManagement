@@ -153,7 +153,7 @@ class Portfolio():
 	def simulate(self, fData):	
 		x = [1. for i in symbols]
 
-		for i in range(len(fData) - 1):
+		for i, _ in enumerate(fData[:-1]):
 			# Get market-relative price vector at current timestep
 			prevRates = []
 			curRates = []
@@ -243,7 +243,7 @@ def getData(b, t, depth, symbol):
 def validateTimesteps(data):
 	print('Final data len: ' + str(len(data)))
 	timesteps = [x[0] for x in data]
-	for i in range(len(timesteps) - 1):
+	for i, _ in enumerate(timesteps[:-1]):
 		if timesteps[i + 1] - timesteps[i] != 60000:
 			plt.plot(timesteps, color='r')
 			plt.show()
