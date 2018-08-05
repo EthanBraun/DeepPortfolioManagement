@@ -81,7 +81,7 @@ class Portfolio():
 		self.initPvm(rates)
 		for epoch in range(self.epochs):
 			self.reset()
-			for i in range(len(rates)):
+			for i, r in enumerate(rates):
 				  
 	
 	# Calculate current portfolio value and set portfolio weights
@@ -101,9 +101,9 @@ class Portfolio():
 		buy = self.tradePer * -sum([v if (v < 0) else 0 for v in valueDelta])
 
 		posValDeltas = {}
-		for i in range(len(valueDelta)):
-			if valueDelta[i] > 0:
-				posValDeltas[i] = valueDelta[i]
+		for i, v in enumerate(valueDelta):
+			if v > 0:
+				posValDeltas[i] = v
 
 		posValDeltaSum = sum(posValDeltas.values())
 		posValDeltaPer = np.divide(list(posValDeltas.values()), posValDeltaSum)
@@ -160,7 +160,7 @@ class Portfolio():
 			xHat = []
 			values = []
 
-			for j in range(len(symbols)):
+			for j, _ in enumerate(symbols):
 				lastClose = fData[i+1][j]
 				prevClose = fData[i][j]
 				curRates.append(lastClose)
@@ -272,11 +272,11 @@ def formatData(data, addBtc):
 	features = [3, 2, 4]
 	fData = []
 	print('pre-formatted data shape: ' + str(np.array(data).shape))
-	for i in range(len(data[0])):
+	for i, _ in enumerate(data[0]):
 		stepData = []
 		for idx in features:
 			try:
-				featVec = [data[j][i][idx] for j in range(len(data))]
+				featVec = [data[j][i][idx] for j, _ in enumerate(data)]
 				stepData.append(np.insert(featVec, 0, 1.) if addBtc else featVec)
 			except Exception:
 				print('Exception occured with (i, idx) = (' + str(i) + ', ' + str(idx) + ')')
@@ -291,7 +291,7 @@ def formatDataForInput(data, window):
 	y = []
 	for i in range(window, len(data)):
 		stepData = []
-		for j in range(len(data[i])):
+		for j, _ in enumerate(data[i]):
 			stepData.append([np.divide(data[k][j], data[i - 1][2])  for k in range(i - window, i)])
 		x.append(stepData)
 		y.append(np.divide(data[i - 1][2], data[i - 2][2]))
