@@ -16,3 +16,4 @@ train function():
 				train network on minibatch (gradient ascent of reward function) and overwrite minibatch pvm
 				
 		print agent reward
+

@@ -27,7 +27,6 @@ class Portfolio():
 		self.setWeights(weights)
 		self.reset()
 		self.tradeFee = 0.0005
-		#self.tradeFee = 0.0000
 		self.tradePer = 1.0 - self.tradeFee
 		self.value = 1.0
 		self.values = [1.0]
@@ -71,7 +70,19 @@ class Portfolio():
 
 	# Re-initialize portfolio state
 	def reset(self):
-		self.weights = [1. / len(self.symbols)] * len(self.symbols)
+		self.weights = [1.] + [0. for i in self.symbols]
+
+	# Instantiate portfolio vector memory with initial values
+	def initPvm(self, rates):
+		self.pvm = [[1.] + [0. for i in self.symbols] for j in rates]
+
+	# RL agent training function
+	def train(self, inTensor, rates):
+		self.initPvm(rates)
+		for epoch in range(self.epochs):
+			self.reset()
+			for i in range(len(rates)):
+				  
 	
 	# Calculate current portfolio value and set portfolio weights
 	def updatePortfolio(self, newWeights, prevWeights, prevValue, prevRates, curRates):
