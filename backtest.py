@@ -34,6 +34,7 @@ class Portfolio():
 		self.noop = noop
 		self.failureChance = failureChance
 
+	# Instantiate fully-convolutional ensemble of identical independent evaluators
 	def createEiieNet(self, inputTensor, mrpVector):
 		biasIn = np.ones(1)
 		mainInputShape = np.array(inputTensor).shape[1:]

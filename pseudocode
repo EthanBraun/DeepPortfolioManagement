@@ -1,0 +1,18 @@
+
+train function():
+	initialize pvm
+	for # epochs:
+		initialize portfolio value
+		for each interval in the training set:
+			# simulate
+			pass current portfolio weights and price tensor into eiie
+			overwrite pvm with output of network
+			update portfolio value
+			add current interval to pvm training stack
+			
+			# train	
+			for # minibatches:
+				randomly select minibatch interval from available data in pvm (according to geometric distribution)
+				train network on minibatch (gradient ascent of reward function) and overwrite minibatch pvm
+				
+		print agent reward
