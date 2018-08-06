@@ -29,7 +29,6 @@ class Portfolio():
 		self.tradeFee = 0.0005
 		self.tradePer = 1.0 - self.tradeFee
 		self.value = 1.0
-		self.values = [1.0]
 		self.noop = noop
 		self.failureChance = failureChance
 
@@ -71,17 +70,39 @@ class Portfolio():
 	# Re-initialize portfolio state
 	def reset(self):
 		self.weights = [1.] + [0. for i in self.symbols]
+		self.value = 1.0
 
 	# Instantiate portfolio vector memory with initial values
 	def initPvm(self, rates):
-		self.pvm = [[1.] + [0. for i in self.symbols] for j in rates]
+		self.pvm = [[1.] + [0. for i in self.symbols] for j in (rates + rates[:1])]
+
+	# Determine change in weights and portfolio value due to price movement between trading periods
+	def updateRateShift(self, prevRates, curRates): 
+		xHat = np.divide([1.] + curRates, [1.] + prevRates)
+		values = [self.getValue() * w * x for w, x in zip(self.getWeights(), xHat)]
+
+		prevValue = self.getValue()
+		self.setValue(sum(values))
+
+		b = np.divide(values, self.getValue())
+		prevWeights = self.getWeights()
+		
+		self.setWeights(b)
+		return prevWeights, b
 
 	# RL agent training function
 	def train(self, inTensor, rates):
 		self.initPvm(rates)
+		# For each epoch
 		for epoch in range(self.epochs):
 			self.reset()
-			for i, r in enumerate(rates):
+			# For each trading period in the interval
+			for i, (r, p, x) in enumerate(zip(rates, self.pvm[:-1], inTensor)):
+				# Determine eiie output at the current period
+				modelInput = np.array([[x, p[1:], [1.]]]) 
+				modelOutput = self.model.predict(modelInput)[0]	
+				# Overwrite pvm at subsequent period
+				self.pvm[i + 1] = modelOutput
 				  
 	
 	# Calculate current portfolio value and set portfolio weights
