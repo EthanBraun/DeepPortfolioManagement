@@ -9,6 +9,7 @@ from random import random as rand
 from keras.models import *
 from keras.layers import *
 import keras.backend as K
+from numpy.random import
 
 
 def expandDims(x):
@@ -19,12 +20,12 @@ def expandDims(x):
 
 # Simulated crypto portfolio
 class Portfolio():
-	def __init__(self, symbols, epsilon, slack, interval, weights, noop=False, failureChance=0):
+	def __init__(self, symbols, weights, pBeta, minibatchCount, minibatchSize, noop=False, failureChance=0):
 		self.symbols = symbols
-		self.epsilon = epsilon
-		self.slack = slack
-		self.interval = interval
 		self.setWeights(weights)
+		self.pBeta = pBeta
+		self.minibatchCount = minibatchCount
+		self.minibatchSize = minibatchSize
 		self.reset()
 		self.tradeFee = 0.0005
 		self.tradePer = 1.0 - self.tradeFee
@@ -62,9 +63,6 @@ class Portfolio():
 	
 	def printParams(self):
 		print('\nPortfolio parameters:')
-		print('\tepsilon: ' + str(self.epsilon))
-		print('\tslack: ' + str(self.slack))
-		print('\tinterval: ' + str(self.interval))
 		print('\tfailure chance: ' + str(self.failureChance))
 
 	# Re-initialize portfolio state
@@ -88,7 +86,17 @@ class Portfolio():
 		prevWeights = self.getWeights()
 		
 		self.setWeights(b)
-		return prevWeights, b
+		return b, prevWeights, prevValue
+
+	# Sample the start index of a training minibatch from a geometric distribution
+	def getMinibatchInterval(self, i):
+		k = geometric(self.pBeta)
+		tB = np.clip(-k - self.minibatchSize + i + 2, 1, i - self.minibatchSize + 1)
+		return tB
+
+	# Ascend reward gradient of minibatch starting at idx
+	def trainOnMinibatch(self, idx):
+		
 
 	# RL agent training function
 	def train(self, inTensor, rates):
@@ -97,13 +105,24 @@ class Portfolio():
 		for epoch in range(self.epochs):
 			self.reset()
 			# For each trading period in the interval
-			for i, (r, p, x) in enumerate(zip(rates, self.pvm[:-1], inTensor)):
+			for i, (r, p, x) in enumerate(zip(rates[1:], self.pvm[1:-1], inTensor[1:])):
 				# Determine eiie output at the current period
 				modelInput = np.array([[x, p[1:], [1.]]]) 
 				modelOutput = self.model.predict(modelInput)[0]	
+
 				# Overwrite pvm at subsequent period
-				self.pvm[i + 1] = modelOutput
-				  
+				self.pvm[i + 2] = modelOutput
+				
+				# Update portfolio for current timestep
+				newB, prevB, prevValue = self.updateRateShift(rates[i], r) 
+				self.updatePortfolio(newB, prevB, prevValue, rates[i], r) 
+				 
+				# Train EIIE over minibatches of historical data
+				if i - self.minibatchSize >= 0:
+					for j in range(self.minibatchCount):
+						# Sample minibatch interval from geometric distribution
+						idx = self.getMinibatchInterval(i)
+						self.trainOnMinibatch(idx)
 	
 	# Calculate current portfolio value and set portfolio weights
 	def updatePortfolio(self, newWeights, prevWeights, prevValue, prevRates, curRates):
