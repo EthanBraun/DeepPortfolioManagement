@@ -60,6 +60,13 @@ class Portfolio():
 		model = Model([mIn, wIn, bIn], mOut) 
 		model.compile(loss='mse', optimizer='nadam')
 		self.model = model
+		
+		# Instantiate custom symbolic gradient
+		mu = K.placeholder(shape=(1, ))
+		y = K.placeholder(shape=(len(self.symbols) + 1,))
+		loss = -K.log(tf.multiply(self.mu, tf.tensordot(model.output, self.y))) 
+		grad = K.gradients(loss, model.trainable_weights)
+		self.getGradient = K.function(inputs=[mIn, mu, y, model.output], outputs=grad) 
 	
 	def printParams(self):
 		print('\nPortfolio parameters:')
@@ -184,9 +191,6 @@ class Portfolio():
 			muSuffix = sum([max((wpI - mu * wI), 0) for wpI, wI in zip(wPrime, w)])
 			mu = (1. / (1. - self.tradeFee * w[0])) * (1. - (self.tradeFee * wPrime[0]) - (2 * self.tradeFee - (self.tradeFee ** 2)) * muSuffix)
 		return mu
-
-
-
 
 
 	# Simulate the pamr agent over a set of data and return the final portfolio value
