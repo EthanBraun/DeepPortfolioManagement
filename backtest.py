@@ -9,8 +9,8 @@ from random import random as rand
 from keras.models import *
 from keras.layers import *
 import keras.backend as K
-from numpy.random import
-
+from numpy.random import geometric
+import tensorflow as tf
 
 def expandDims(x):
 	expX = K.expand_dims(x, axis=1)	
@@ -20,12 +20,14 @@ def expandDims(x):
 
 # Simulated crypto portfolio
 class Portfolio():
-	def __init__(self, symbols, weights, pBeta, minibatchCount, minibatchSize, noop=False, failureChance=0):
+	def __init__(self, symbols, weights, pBeta, k, minibatchCount, minibatchSize, epochs, noop=False, failureChance=0):
 		self.symbols = symbols
 		self.setWeights(weights)
 		self.pBeta = pBeta
+		self.k = k
 		self.minibatchCount = minibatchCount
 		self.minibatchSize = minibatchSize
+		self.epochs = epochs
 		self.reset()
 		self.tradeFee = 0.0005
 		self.tradePer = 1.0 - self.tradeFee
@@ -62,11 +64,13 @@ class Portfolio():
 		self.model = model
 		
 		# Instantiate custom symbolic gradient
-		mu = K.placeholder(shape=(1, ))
-		y = K.placeholder(shape=(len(self.symbols) + 1,))
-		loss = -K.log(tf.multiply(self.mu, tf.tensordot(model.output, self.y))) 
+		mu = K.placeholder(shape=(None, 1,))
+		y = K.placeholder(shape=(None, len(self.symbols) + 1,))
+		#mu = K.placeholder(shape=(1, ))
+		#y = K.placeholder(shape=(len(self.symbols) + 1,))
+		loss = -K.log(tf.multiply(mu, tf.tensordot(model.output, y, axes=1))) 
 		grad = K.gradients(loss, model.trainable_weights)
-		self.getGradient = K.function(inputs=[mIn, mu, y, model.output], outputs=grad) 
+		self.getGradient = K.function(inputs=[mIn, wIn, bIn, mu, y, model.output], outputs=grad) 
 	
 	def printParams(self):
 		print('\nPortfolio parameters:')
@@ -102,7 +106,32 @@ class Portfolio():
 		return tB
 
 	# Ascend reward gradient of minibatch starting at idx
-	def trainOnMinibatch(self, idx):
+	def trainOnMinibatch(self, idx, inTensor, rates):
+		mIn = inTensor[idx:idx + self.minibatchSize]
+		wIn = [w[1:] for w in self.pvm[idx:idx + self.minibatchSize]]
+		bIn = [[1.0] for i in range(self.minibatchSize)]
+	
+		out = self.model.predict([mIn, wIn, bIn], batch_size=self.minibatchSize)[0] 
+
+		pP = [[1.] + list(r) for r in rates[idx - 1:idx + self.minibatchSize - 1]]
+		pC = [[1.] + list(r) for r in rates[idx:idx + self.minibatchSize]] 
+		pN = [[1.] + list(r) for r in rates[idx + 1:idx + self.minibatchSize + 1]] 
+
+		# Previous and current market relative price matrices
+		yP = np.divide(pC, pP)
+		yC = np.divide(pN, pC)	
+		
+		wPrev = [w for w in self.pvm[idx:idx + self.minibatchSize]]
+		wPrime = np.divide(np.multiply(yP, wPrev), np.dot(yP, wPrev))
+
+		mu = [self.calculateMu(wPT, wT, self.k) for _, (wPT, wT) in enumerate(zip(wPrime, out))]
+		
+		grad = self.getGradient(inputs=[mIn, wIn, bIn, mu, yC, out])  
+		update = [self.learningRate * g for g in grad]
+		
+		modelWeights = self.model.get_weights()
+		updateWeights = [K.add(wT, uT) for _, (wT, uT) in enumerate(zip(modelWeights, updates))]
+		self.model.set_weights(updateWeights)
 		
 
 	# RL agent training function
@@ -129,7 +158,8 @@ class Portfolio():
 					for j in range(self.minibatchCount):
 						# Sample minibatch interval from geometric distribution
 						idx = self.getMinibatchInterval(i)
-						self.trainOnMinibatch(idx)
+						self.trainOnMinibatch(idx, inTensor, rates)
+			print('Epoch ' + str(epoch) + ' value: ' + str(self.getValue()))
 	
 	# Calculate current portfolio value and set portfolio weights
 	def updatePortfolio(self, newWeights, prevWeights, prevValue, prevRates, curRates):
@@ -359,7 +389,7 @@ symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'XRP/BTC', 'NEO/BTC','ADA
 #depth = 210000
 depth = 110000
 #clip = 35000
-clip = 60000
+clip = 65000
 holdBtc = True
 window = 50
 
@@ -390,10 +420,16 @@ if holdBtc:
 
 print('\n\nx shape: ' + str(np.array(x).shape))
 print('y shape: ' + str(np.array(y).shape))
-b = [1 / float(len(symbols))] * len(symbols)
+b = [1.] + [0.] * (len(symbols) - 1)  
+pBeta = 0.5
+k = 15
+minibatchCount = 3
+minibatchSize = 4
+epochs = 10
 
-port = Portfolio(symbols, 0.25, 9, 30, b)
+port = Portfolio(symbols, b, pBeta, k, minibatchCount, minibatchSize, epochs)
 port.createEiieNet(x, y)
+#port
 
 print('\n' + str(port.model.summary()))
 
