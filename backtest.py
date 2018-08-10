@@ -42,10 +42,7 @@ class Portfolio():
 		mainInputShape = np.array(inputTensor).shape[1:]
 		weightInputShape = np.array(rates).shape[1:]
 		biasInputShape = biasIn.shape
-		#print('mainInputShape: ' + str(mainInputShape))
-		#print('weightInputShape: ' + str(weightInputShape))
-		#print('biasInputShape: ' + str(biasInputShape))
-		
+
 		mIn = Input(shape=mainInputShape, name='mainInput')
 		x = Conv2D(2, (3, 1))(mIn)
 		x = Activation('relu')(x)
@@ -65,10 +62,10 @@ class Portfolio():
 		self.model = model
 		
 		# Instantiate custom symbolic gradient
-		mu = K.placeholder(shape=(None, 1,))
-		y = K.placeholder(shape=(None, len(self.symbols),))
-		#mu = K.placeholder(shape=(1, ))
-		#y = K.placeholder(shape=(len(self.symbols) + 1,))
+		#mu = K.placeholder(shape=(None, 1,))
+		#y = K.placeholder(shape=(None, len(self.symbols),))
+		mu = K.placeholder(shape=(1, ), name='mu')
+		y = K.placeholder(shape=(len(self.symbols),), name='y')
 		loss = -K.log(tf.multiply(mu, tf.tensordot(model.output, y, axes=1))) 
 		grad = K.gradients(loss, model.trainable_weights)
 		self.getGradient = K.function(inputs=[mIn, wIn, bIn, mu, y, model.output], outputs=grad) 
@@ -149,13 +146,13 @@ class Portfolio():
 		
 		wPrev = np.array(self.pvm[idx:idx + self.minibatchSize])
 		
-		print('yP shape: ' + str(yP.shape))
-		print('wPrev shape: ' + str(wPrev.shape))
+		#print('yP shape: ' + str(yP.shape))
+		#print('wPrev shape: ' + str(wPrev.shape))
 		wpNum = np.multiply(yP, wPrev)
 		wpDen = np.array([np.dot(ypT, wpT) for (ypT, wpT) in zip(yP, wPrev)])
-		print('\n\nwpNum shape: ' + str(wpNum.shape))
-		print('wpDen shape: ' + str(wpDen.shape))
-		print('\n')
+		#print('\n\nwpNum shape: ' + str(wpNum.shape))
+		#print('wpDen shape: ' + str(wpDen.shape))
+		#print('\n')
 		wPrime = [np.divide(n, d) for (n, d) in zip(wpNum, wpDen)]
 
 		#print('len squeeze out: ' + str(len(squeezeOut)))
@@ -169,10 +166,11 @@ class Portfolio():
 		#print('yC shape: ' + str(yC.shape))
 		#print('out shape: ' + str(out.shape))
 
-		grad = [self.getGradient(inputs=[[mT], [wT], [bT], [muT], [yT], [oT]]) for (mT, wT, bT, muT, yT, oT) in zip(mIn, wIn, bIn, mu, yC, out)]  
+		#grad = [self.getGradient(inputs=[[mT], [wT], [bT], [muT], [yT], [oT]]) for (mT, wT, bT, muT, yT, oT) in zip(mIn, wIn, bIn, mu, yC, out)]  
+		grad = [self.getGradient(inputs=[[mT], [wT], [bT], muT, yT, [oT]]) for (mT, wT, bT, muT, yT, oT) in zip(mIn, wIn, bIn, mu, yC, out)]  
 		batchGrad = np.sum(grad, axis=0)
 
-		print('\n\n\t\t\tAFTER GET GRADIENT\n\n')
+		#print('\n\n\t\t\tAFTER GET GRADIENT\n\n')
 		updates = [self.learningRate * g for g in batchGrad]
 		
 		modelWeights = self.model.get_weights()
@@ -192,6 +190,7 @@ class Portfolio():
 		self.initPvm(rates)
 		# For each epoch
 		for epoch in range(self.epochs):
+			print('\nBeginning epoch ' + str(epoch))
 			self.reset()
 			# For each trading period in the interval
 			for i, (r, p, x) in enumerate(zip(rates[1:], self.pvm[1:-1], inTensor[1:])):
@@ -208,6 +207,7 @@ class Portfolio():
 				# Update portfolio for current timestep
 				newB, prevB, prevValue = self.updateRateShift(rates[i], r) 
 				self.updatePortfolio(newB, prevB, prevValue, rates[i], r) 
+				print('\ti (' + str(i) + ') value: ' + str(self.getValue()))
 				 
 				# Train EIIE over minibatches of historical data
 				if i - self.minibatchSize >= 0:
@@ -445,11 +445,11 @@ binance = ccxt.binance()
 binance.load_markets()
 #symbols = ['DENT/BTC', 'ETH/BTC', 'ETC/BTC', 'EOS/BTC', 'MFT/BTC', 'KEY/BTC', 'NPXS/BTC', 'NEO/BTC', 'ICX/BTC', 'QKC/BTC', 'XRP/BTC', 'LOOM/BTC', 'ONT/BTC', 'ADA/BTC']
 
-symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XLM/BTC', 'NEO/BTC', 'LTC/BTC', 'ADA/BTC']
+#symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XLM/BTC', 'NEO/BTC', 'LTC/BTC', 'ADA/BTC']
 
 #symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'XRP/BTC', 'NEO/BTC','ADA/BTC']
 
-#symbols = ['EOS/BTC', 'ETH/BTC']
+symbols = ['EOS/BTC', 'ETH/BTC']
 
 #symbols = ['ETH/BTC', 'XRP/BTC', 'XLM/BTC', 'ADA/BTC', 'NEO/BTC', 'XMR/BTC', 'XEM/BTC', 'EOS/BTC', 'ICX/BTC', 'LTC/BTC', 'QTUM/BTC', 'VEN/BTC', 'NAV/BTC', 'BQX/BTC']
 #symbols = ['TRX/BTC', 'ETC/BTC', 'BCH/BTC', 'IOTA/BTC', 'ZRX/BTC', 'WAN/BTC', 'WAVES/BTC', 'SNT/BTC', 'MCO/BTC', 'DASH/BTC', 'ELF/BTC', 'AION/BTC', 'STRAT/BTC', 'XVG/BTC', 'EDO/BTC', 'IOST/BTC', 'WABI/BTC', 'SUB/BTC', 'OMG/BTC', 'WTC/BTC', 'LSK/BTC', 'ZEC/BTC', 'STEEM/BTC', 'QSP/BTC', 'SALT/BTC', 'ETH/BTC', 'XRP/BTC', 'XLM/BTC', 'ADA/BTC', 'NEO/BTC', 'XMR/BTC', 'XEM/BTC', 'EOS/BTC', 'ICX/BTC', 'LTC/BTC', 'QTUM/BTC', 'VEN/BTC', 'NAV/BTC', 'BQX/BTC']
@@ -459,7 +459,7 @@ symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XL
 #depth = 210000
 depth = 110000
 #clip = 35000
-clip = 65000
+clip = 95000
 holdBtc = True
 window = 50
 
