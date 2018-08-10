@@ -20,11 +20,12 @@ def expandDims(x):
 
 # Simulated crypto portfolio
 class Portfolio():
-	def __init__(self, symbols, weights, pBeta, k, minibatchCount, minibatchSize, epochs, noop=False, failureChance=0):
+	def __init__(self, symbols, weights, pBeta, k, learningRate, minibatchCount, minibatchSize, epochs, noop=False, failureChance=0):
 		self.symbols = symbols
 		self.setWeights(weights)
 		self.pBeta = pBeta
 		self.k = k
+		self.learningRate = learningRate
 		self.minibatchCount = minibatchCount
 		self.minibatchSize = minibatchSize
 		self.epochs = epochs
@@ -36,10 +37,10 @@ class Portfolio():
 		self.failureChance = failureChance
 
 	# Instantiate fully-convolutional ensemble of identical independent evaluators
-	def createEiieNet(self, inputTensor, mrpVector):
+	def createEiieNet(self, inputTensor, rates):
 		biasIn = np.ones(1)
 		mainInputShape = np.array(inputTensor).shape[1:]
-		weightInputShape = np.array(mrpVector).shape[1:]
+		weightInputShape = np.array(rates).shape[1:]
 		biasInputShape = biasIn.shape
 		print('mainInputShape: ' + str(mainInputShape))
 		print('weightInputShape: ' + str(weightInputShape))
@@ -65,7 +66,7 @@ class Portfolio():
 		
 		# Instantiate custom symbolic gradient
 		mu = K.placeholder(shape=(None, 1,))
-		y = K.placeholder(shape=(None, len(self.symbols) + 1,))
+		y = K.placeholder(shape=(None, len(self.symbols),))
 		#mu = K.placeholder(shape=(1, ))
 		#y = K.placeholder(shape=(len(self.symbols) + 1,))
 		loss = -K.log(tf.multiply(mu, tf.tensordot(model.output, y, axes=1))) 
@@ -78,12 +79,16 @@ class Portfolio():
 
 	# Re-initialize portfolio state
 	def reset(self):
-		self.weights = [1.] + [0. for i in self.symbols]
+		self.weights = [1.] + [0. for i in self.symbols[1:]]
 		self.value = 1.0
 
 	# Instantiate portfolio vector memory with initial values
 	def initPvm(self, rates):
-		self.pvm = [[1.] + [0. for i in self.symbols] for j in (rates + rates[:1])]
+		print('Initializing pvm')
+		self.pvm = [[1.] + [0. for i in self.symbols[1:]] for j in (rates + rates[:1])]
+		print('PVM init shape: ' + str(np.array(self.pvm).shape))
+		print('pvm[0]: ' + str(self.pvm[0]))
+		print('pvm[100]: ' + str(self.pvm[100]))
 
 	# Determine change in weights and portfolio value due to price movement between trading periods
 	def updateRateShift(self, prevRates, curRates): 
@@ -107,11 +112,32 @@ class Portfolio():
 
 	# Ascend reward gradient of minibatch starting at idx
 	def trainOnMinibatch(self, idx, inTensor, rates):
-		mIn = inTensor[idx:idx + self.minibatchSize]
-		wIn = [w[1:] for w in self.pvm[idx:idx + self.minibatchSize]]
-		bIn = [[1.0] for i in range(self.minibatchSize)]
+		print('pvm shape: ' + str(np.array(self.pvm).shape))
+		print('pvm[0]: ' + str(self.pvm[0]))
+		print('pvm[100]: ' + str(self.pvm[100]))
+
+		pvmSeg = self.pvm[idx:idx + self.minibatchSize]
+		print('pvmSeg shape: ' + str(np.array(pvmSeg).shape))
+		print('pvmSeg: ' + str(pvmSeg))
+		print()
+
+		truncPvmSeg = [q[1:] for q in pvmSeg]
+		print('truncPvmSeg shape: ' + str(np.array(truncPvmSeg).shape))
+		print('truncPvmSeg: ' + str(truncPvmSeg))
+		print()
+		
+		mIn = np.array(inTensor[idx:idx + self.minibatchSize])
+		#wIn = np.array([w[1:] for w in self.pvm[idx:idx + self.minibatchSize]])
+		wIn = np.array(truncPvmSeg)
+		bIn = np.array([[1.0]] * self.minibatchSize)
 	
-		out = self.model.predict([mIn, wIn, bIn], batch_size=self.minibatchSize)[0] 
+		print('wIn shape: ' + str(wIn.shape))
+		print('wIn: ' + str(wIn))
+		print()
+		
+		out = self.model.predict([mIn, wIn, bIn], batch_size=self.minibatchSize) 
+		squeezeOut = np.squeeze(out)
+		print('\n\t\tout shape: ' + str(out.shape))
 
 		pP = [[1.] + list(r) for r in rates[idx - 1:idx + self.minibatchSize - 1]]
 		pC = [[1.] + list(r) for r in rates[idx:idx + self.minibatchSize]] 
@@ -124,13 +150,27 @@ class Portfolio():
 		wPrev = [w for w in self.pvm[idx:idx + self.minibatchSize]]
 		wPrime = np.divide(np.multiply(yP, wPrev), np.dot(yP, wPrev))
 
-		mu = [self.calculateMu(wPT, wT, self.k) for _, (wPT, wT) in enumerate(zip(wPrime, out))]
+		print('len squeeze out: ' + str(len(squeezeOut)))
+
+		mu = [[self.calculateMu(wPT, wT, self.k)] for _, (wPT, wT) in enumerate(zip(wPrime, squeezeOut))]
 		
+		print('mIn shape: ' + str(mIn.shape))
+		print('wIn shape: ' + str(wIn.shape))
+		print('bIn shape: ' + str(bIn.shape))
+		print('mu shape: ' + str(np.array(mu).shape))
+		print('yC shape: ' + str(yC.shape))
+		print('out shape: ' + str(out.shape))
 		grad = self.getGradient(inputs=[mIn, wIn, bIn, mu, yC, out])  
-		update = [self.learningRate * g for g in grad]
+		updates = [self.learningRate * g for g in grad]
 		
 		modelWeights = self.model.get_weights()
-		updateWeights = [K.add(wT, uT) for _, (wT, uT) in enumerate(zip(modelWeights, updates))]
+		updateWeights = [np.add(wT, uT) for (wT, uT) in zip(modelWeights, updates)]
+		print()
+		print()
+		print('updates shape: ' + str(np.array(updates).shape))
+		print('modelWeights shape: ' + str(np.array(modelWeights).shape))
+		print()
+		print()
 		self.model.set_weights(updateWeights)
 		
 
@@ -143,11 +183,14 @@ class Portfolio():
 			# For each trading period in the interval
 			for i, (r, p, x) in enumerate(zip(rates[1:], self.pvm[1:-1], inTensor[1:])):
 				# Determine eiie output at the current period
-				modelInput = np.array([[x, p[1:], [1.]]]) 
-				modelOutput = self.model.predict(modelInput)[0]	
+				mIn = np.array([x])
+				wIn = np.array([np.squeeze(p[1:])])
+				bIn = np.array([1.])
+				modelOutput = self.model.predict([mIn, wIn, bIn])[0]	
+				print('modelOutput[0] shape: ' + str(modelOutput.shape))
 
 				# Overwrite pvm at subsequent period
-				self.pvm[i + 2] = modelOutput
+				self.pvm[i + 2] = modelOutput[0][0]
 				
 				# Update portfolio for current timestep
 				newB, prevB, prevValue = self.updateRateShift(rates[i], r) 
@@ -164,7 +207,7 @@ class Portfolio():
 	# Calculate current portfolio value and set portfolio weights
 	def updatePortfolio(self, newWeights, prevWeights, prevValue, prevRates, curRates):
 		# Calculate current portfolio value
-		rateRatios = np.divide(curRates, prevRates)
+		rateRatios = [1.] + list(np.divide(curRates, prevRates))
 		prevValues = np.multiply(prevWeights, prevValue)
 		currentValues = np.multiply(rateRatios, prevValues)
 		currentVal = sum(currentValues)
@@ -213,12 +256,20 @@ class Portfolio():
 
 	# Iteratively calculate the transaction remainder factor for the period
 	def calculateMu(self, wPrime, w, k):
+		print('wPrime type: ' + str(type(wPrime)))
+		print('w type: ' + str(type(w)))
+		print()
+
+		print('wPrime shape: ' + str(np.array(wPrime).shape))
+		print('w shape: ' + str(np.array(w).shape))
+
 		# Calculate initial mu value
 		mu = self.tradeFee * sum([abs(wpI - wI) for wpI, wI in zip(wPrime, w)]) 	
 
 		# Calculate iteration of mu
 		for i in range(k):
-			muSuffix = sum([max((wpI - mu * wI), 0) for wpI, wI in zip(wPrime, w)])
+			print('pre muSuff: ' + str([(wpI - mu * wI) for (wpI, wI) in zip(wPrime, w)]))
+			muSuffix = sum([max((wpI - mu * wI), 0) for (wpI, wI) in zip(wPrime, w)])
 			mu = (1. / (1. - self.tradeFee * w[0])) * (1. - (self.tradeFee * wPrime[0]) - (2 * self.tradeFee - (self.tradeFee ** 2)) * muSuffix)
 		return mu
 
@@ -363,13 +414,15 @@ def formatData(data, addBtc):
 def formatDataForInput(data, window):
 	x = []
 	y = []
+	rates = []
 	for i in range(window, len(data)):
 		stepData = []
 		for j, _ in enumerate(data[i]):
 			stepData.append([np.divide(data[k][j], data[i - 1][2])  for k in range(i - window, i)])
 		x.append(stepData)
 		y.append(np.divide(data[i - 1][2], data[i - 2][2]))
-	return x, y
+		rates.append(data[i][2])
+	return x, y, rates
 
 now = int(time() * 1000)
 start = now - 500 * 60000
@@ -378,7 +431,10 @@ binance.load_markets()
 #symbols = ['DENT/BTC', 'ETH/BTC', 'ETC/BTC', 'EOS/BTC', 'MFT/BTC', 'KEY/BTC', 'NPXS/BTC', 'NEO/BTC', 'ICX/BTC', 'QKC/BTC', 'XRP/BTC', 'LOOM/BTC', 'ONT/BTC', 'ADA/BTC']
 
 #symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XLM/BTC', 'NEO/BTC', 'LTC/BTC', 'ADA/BTC']
-symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'XRP/BTC', 'NEO/BTC','ADA/BTC']
+
+#symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'XRP/BTC', 'NEO/BTC','ADA/BTC']
+symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC']
+
 #symbols = ['EOS/BTC', 'ETH/BTC']
 
 #symbols = ['ETH/BTC', 'XRP/BTC', 'XLM/BTC', 'ADA/BTC', 'NEO/BTC', 'XMR/BTC', 'XEM/BTC', 'EOS/BTC', 'ICX/BTC', 'LTC/BTC', 'QTUM/BTC', 'VEN/BTC', 'NAV/BTC', 'BQX/BTC']
@@ -387,7 +443,8 @@ symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'XRP/BTC', 'NEO/BTC','ADA
 #depth = 110000
 
 #depth = 210000
-depth = 110000
+#depth = 110000
+depth = 80000
 #clip = 35000
 clip = 65000
 holdBtc = True
@@ -411,7 +468,7 @@ for sym in symbols:
 tData = truncateData(data)
 checkTruncData(tData)
 fData = formatData(tData, False)
-x, y = formatDataForInput(fData, window)
+x, y, rates = formatDataForInput(fData, window)
 
 
 # Modify symbols and data if portfolios can hold BTC
@@ -423,13 +480,14 @@ print('y shape: ' + str(np.array(y).shape))
 b = [1.] + [0.] * (len(symbols) - 1)  
 pBeta = 0.5
 k = 15
+learningRate = 0.0001
 minibatchCount = 3
 minibatchSize = 4
 epochs = 10
 
-port = Portfolio(symbols, b, pBeta, k, minibatchCount, minibatchSize, epochs)
+port = Portfolio(symbols, b, pBeta, k, learningRate, minibatchCount, minibatchSize, epochs)
 port.createEiieNet(x, y)
-#port
+port.train(x, rates)
 
 print('\n' + str(port.model.summary()))
 
