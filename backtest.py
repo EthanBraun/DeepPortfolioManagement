@@ -42,9 +42,9 @@ class Portfolio():
 		mainInputShape = np.array(inputTensor).shape[1:]
 		weightInputShape = np.array(rates).shape[1:]
 		biasInputShape = biasIn.shape
-		print('mainInputShape: ' + str(mainInputShape))
-		print('weightInputShape: ' + str(weightInputShape))
-		print('biasInputShape: ' + str(biasInputShape))
+		#print('mainInputShape: ' + str(mainInputShape))
+		#print('weightInputShape: ' + str(weightInputShape))
+		#print('biasInputShape: ' + str(biasInputShape))
 		
 		mIn = Input(shape=mainInputShape, name='mainInput')
 		x = Conv2D(2, (3, 1))(mIn)
@@ -84,11 +84,11 @@ class Portfolio():
 
 	# Instantiate portfolio vector memory with initial values
 	def initPvm(self, rates):
-		print('Initializing pvm')
+		#print('Initializing pvm')
 		self.pvm = [[1.] + [0. for i in self.symbols[1:]] for j in (rates + rates[:1])]
-		print('PVM init shape: ' + str(np.array(self.pvm).shape))
-		print('pvm[0]: ' + str(self.pvm[0]))
-		print('pvm[100]: ' + str(self.pvm[100]))
+		#print('PVM init shape: ' + str(np.array(self.pvm).shape))
+		#print('pvm[0]: ' + str(self.pvm[0]))
+		#print('pvm[100]: ' + str(self.pvm[100]))
 
 	# Determine change in weights and portfolio value due to price movement between trading periods
 	def updateRateShift(self, prevRates, curRates): 
@@ -112,32 +112,32 @@ class Portfolio():
 
 	# Ascend reward gradient of minibatch starting at idx
 	def trainOnMinibatch(self, idx, inTensor, rates):
-		print('pvm shape: ' + str(np.array(self.pvm).shape))
-		print('pvm[0]: ' + str(self.pvm[0]))
-		print('pvm[100]: ' + str(self.pvm[100]))
+		#print('pvm shape: ' + str(np.array(self.pvm).shape))
+		#print('pvm[0]: ' + str(self.pvm[0]))
+		#print('pvm[100]: ' + str(self.pvm[100]))
 
 		pvmSeg = self.pvm[idx:idx + self.minibatchSize]
-		print('pvmSeg shape: ' + str(np.array(pvmSeg).shape))
-		print('pvmSeg: ' + str(pvmSeg))
-		print()
+		#print('pvmSeg shape: ' + str(np.array(pvmSeg).shape))
+		#print('pvmSeg: ' + str(pvmSeg))
+		#print()
 
 		truncPvmSeg = [q[1:] for q in pvmSeg]
-		print('truncPvmSeg shape: ' + str(np.array(truncPvmSeg).shape))
-		print('truncPvmSeg: ' + str(truncPvmSeg))
-		print()
+		#print('truncPvmSeg shape: ' + str(np.array(truncPvmSeg).shape))
+		#print('truncPvmSeg: ' + str(truncPvmSeg))
+		#print()
 		
 		mIn = np.array(inTensor[idx:idx + self.minibatchSize])
 		#wIn = np.array([w[1:] for w in self.pvm[idx:idx + self.minibatchSize]])
 		wIn = np.array(truncPvmSeg)
 		bIn = np.array([[1.0]] * self.minibatchSize)
 	
-		print('wIn shape: ' + str(wIn.shape))
-		print('wIn: ' + str(wIn))
-		print()
+		#print('wIn shape: ' + str(wIn.shape))
+		#print('wIn: ' + str(wIn))
+		#print()
 		
 		out = self.model.predict([mIn, wIn, bIn], batch_size=self.minibatchSize) 
 		squeezeOut = np.squeeze(out)
-		print('\n\t\tout shape: ' + str(out.shape))
+		#print('\n\t\tout shape: ' + str(out.shape))
 
 		pP = [[1.] + list(r) for r in rates[idx - 1:idx + self.minibatchSize - 1]]
 		pC = [[1.] + list(r) for r in rates[idx:idx + self.minibatchSize]] 
@@ -147,32 +147,45 @@ class Portfolio():
 		yP = np.divide(pC, pP)
 		yC = np.divide(pN, pC)	
 		
-		wPrev = [w for w in self.pvm[idx:idx + self.minibatchSize]]
-		wPrime = np.divide(np.multiply(yP, wPrev), np.dot(yP, wPrev))
-
-		print('len squeeze out: ' + str(len(squeezeOut)))
-
-		mu = [[self.calculateMu(wPT, wT, self.k)] for _, (wPT, wT) in enumerate(zip(wPrime, squeezeOut))]
+		wPrev = np.array(self.pvm[idx:idx + self.minibatchSize])
 		
-		print('mIn shape: ' + str(mIn.shape))
-		print('wIn shape: ' + str(wIn.shape))
-		print('bIn shape: ' + str(bIn.shape))
-		print('mu shape: ' + str(np.array(mu).shape))
-		print('yC shape: ' + str(yC.shape))
-		print('out shape: ' + str(out.shape))
-		grad = self.getGradient(inputs=[mIn, wIn, bIn, mu, yC, out])  
-		updates = [self.learningRate * g for g in grad]
+		print('yP shape: ' + str(yP.shape))
+		print('wPrev shape: ' + str(wPrev.shape))
+		wpNum = np.multiply(yP, wPrev)
+		wpDen = np.array([np.dot(ypT, wpT) for (ypT, wpT) in zip(yP, wPrev)])
+		print('\n\nwpNum shape: ' + str(wpNum.shape))
+		print('wpDen shape: ' + str(wpDen.shape))
+		print('\n')
+		wPrime = [np.divide(n, d) for (n, d) in zip(wpNum, wpDen)]
+
+		#print('len squeeze out: ' + str(len(squeezeOut)))
+
+		mu = [[self.calculateMu(wPT, wT, self.k)] for (wPT, wT) in zip(wPrime, squeezeOut)]
+		
+		#print('mIn shape: ' + str(mIn.shape))
+		#print('wIn shape: ' + str(wIn.shape))
+		#print('bIn shape: ' + str(bIn.shape))
+		#print('mu shape: ' + str(np.array(mu).shape))
+		#print('yC shape: ' + str(yC.shape))
+		#print('out shape: ' + str(out.shape))
+
+		grad = [self.getGradient(inputs=[[mT], [wT], [bT], [muT], [yT], [oT]]) for (mT, wT, bT, muT, yT, oT) in zip(mIn, wIn, bIn, mu, yC, out)]  
+		batchGrad = np.sum(grad, axis=0)
+
+		print('\n\n\t\t\tAFTER GET GRADIENT\n\n')
+		updates = [self.learningRate * g for g in batchGrad]
 		
 		modelWeights = self.model.get_weights()
 		updateWeights = [np.add(wT, uT) for (wT, uT) in zip(modelWeights, updates)]
+		"""
 		print()
 		print()
 		print('updates shape: ' + str(np.array(updates).shape))
 		print('modelWeights shape: ' + str(np.array(modelWeights).shape))
 		print()
 		print()
+		"""
 		self.model.set_weights(updateWeights)
-		
 
 	# RL agent training function
 	def train(self, inTensor, rates):
@@ -187,7 +200,7 @@ class Portfolio():
 				wIn = np.array([np.squeeze(p[1:])])
 				bIn = np.array([1.])
 				modelOutput = self.model.predict([mIn, wIn, bIn])[0]	
-				print('modelOutput[0] shape: ' + str(modelOutput.shape))
+				#print('modelOutput[0] shape: ' + str(modelOutput.shape))
 
 				# Overwrite pvm at subsequent period
 				self.pvm[i + 2] = modelOutput[0][0]
@@ -256,19 +269,21 @@ class Portfolio():
 
 	# Iteratively calculate the transaction remainder factor for the period
 	def calculateMu(self, wPrime, w, k):
+		"""
 		print('wPrime type: ' + str(type(wPrime)))
 		print('w type: ' + str(type(w)))
 		print()
 
 		print('wPrime shape: ' + str(np.array(wPrime).shape))
 		print('w shape: ' + str(np.array(w).shape))
+		"""
 
 		# Calculate initial mu value
 		mu = self.tradeFee * sum([abs(wpI - wI) for wpI, wI in zip(wPrime, w)]) 	
 
 		# Calculate iteration of mu
 		for i in range(k):
-			print('pre muSuff: ' + str([(wpI - mu * wI) for (wpI, wI) in zip(wPrime, w)]))
+			#print('pre muSuff: ' + str([(wpI - mu * wI) for (wpI, wI) in zip(wPrime, w)]))
 			muSuffix = sum([max((wpI - mu * wI), 0) for (wpI, wI) in zip(wPrime, w)])
 			mu = (1. / (1. - self.tradeFee * w[0])) * (1. - (self.tradeFee * wPrime[0]) - (2 * self.tradeFee - (self.tradeFee ** 2)) * muSuffix)
 		return mu
@@ -430,10 +445,9 @@ binance = ccxt.binance()
 binance.load_markets()
 #symbols = ['DENT/BTC', 'ETH/BTC', 'ETC/BTC', 'EOS/BTC', 'MFT/BTC', 'KEY/BTC', 'NPXS/BTC', 'NEO/BTC', 'ICX/BTC', 'QKC/BTC', 'XRP/BTC', 'LOOM/BTC', 'ONT/BTC', 'ADA/BTC']
 
-#symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XLM/BTC', 'NEO/BTC', 'LTC/BTC', 'ADA/BTC']
+symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XLM/BTC', 'NEO/BTC', 'LTC/BTC', 'ADA/BTC']
 
 #symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'XRP/BTC', 'NEO/BTC','ADA/BTC']
-symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC']
 
 #symbols = ['EOS/BTC', 'ETH/BTC']
 
@@ -443,8 +457,7 @@ symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC']
 #depth = 110000
 
 #depth = 210000
-#depth = 110000
-depth = 80000
+depth = 110000
 #clip = 35000
 clip = 65000
 holdBtc = True
