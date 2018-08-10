@@ -99,7 +99,8 @@ class Portfolio():
 		prevWeights = self.getWeights()
 		
 		self.setWeights(b)
-		return b, prevWeights, prevValue
+		#return b, prevWeights, prevValue
+		return b, prevWeights, self.getValue()
 
 	# Sample the start index of a training minibatch from a geometric distribution
 	def getMinibatchInterval(self, i):
@@ -205,9 +206,12 @@ class Portfolio():
 				self.pvm[i + 2] = modelOutput[0][0]
 				
 				# Update portfolio for current timestep
-				newB, prevB, prevValue = self.updateRateShift(rates[i], r) 
-				self.updatePortfolio(newB, prevB, prevValue, rates[i], r) 
-				print('\ti (' + str(i) + ') value: ' + str(self.getValue()))
+				#newB, prevB, prevValue = self.updateRateShift(rates[i], r) 
+				#self.updatePortfolio(newB, prevB, prevValue, rates[i], r) 
+				newB, prevB, curValue = self.updateRateShift(rates[i], r) 
+				self.updatePortfolio(modelOutput[0][0], newB, curValue, rates[i], r) 
+				if i % 1000 == 0:
+					print('\ti (' + str(i) + ') value: ' + str(self.getValue()))
 				 
 				# Train EIIE over minibatches of historical data
 				if i - self.minibatchSize >= 0:
@@ -445,11 +449,11 @@ binance = ccxt.binance()
 binance.load_markets()
 #symbols = ['DENT/BTC', 'ETH/BTC', 'ETC/BTC', 'EOS/BTC', 'MFT/BTC', 'KEY/BTC', 'NPXS/BTC', 'NEO/BTC', 'ICX/BTC', 'QKC/BTC', 'XRP/BTC', 'LOOM/BTC', 'ONT/BTC', 'ADA/BTC']
 
-#symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XLM/BTC', 'NEO/BTC', 'LTC/BTC', 'ADA/BTC']
+symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XLM/BTC', 'NEO/BTC', 'LTC/BTC', 'ADA/BTC']
 
 #symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'XRP/BTC', 'NEO/BTC','ADA/BTC']
 
-symbols = ['EOS/BTC', 'ETH/BTC']
+#symbols = ['EOS/BTC', 'ETH/BTC']
 
 #symbols = ['ETH/BTC', 'XRP/BTC', 'XLM/BTC', 'ADA/BTC', 'NEO/BTC', 'XMR/BTC', 'XEM/BTC', 'EOS/BTC', 'ICX/BTC', 'LTC/BTC', 'QTUM/BTC', 'VEN/BTC', 'NAV/BTC', 'BQX/BTC']
 #symbols = ['TRX/BTC', 'ETC/BTC', 'BCH/BTC', 'IOTA/BTC', 'ZRX/BTC', 'WAN/BTC', 'WAVES/BTC', 'SNT/BTC', 'MCO/BTC', 'DASH/BTC', 'ELF/BTC', 'AION/BTC', 'STRAT/BTC', 'XVG/BTC', 'EDO/BTC', 'IOST/BTC', 'WABI/BTC', 'SUB/BTC', 'OMG/BTC', 'WTC/BTC', 'LSK/BTC', 'ZEC/BTC', 'STEEM/BTC', 'QSP/BTC', 'SALT/BTC', 'ETH/BTC', 'XRP/BTC', 'XLM/BTC', 'ADA/BTC', 'NEO/BTC', 'XMR/BTC', 'XEM/BTC', 'EOS/BTC', 'ICX/BTC', 'LTC/BTC', 'QTUM/BTC', 'VEN/BTC', 'NAV/BTC', 'BQX/BTC']
@@ -459,7 +463,7 @@ symbols = ['EOS/BTC', 'ETH/BTC']
 #depth = 210000
 depth = 110000
 #clip = 35000
-clip = 95000
+clip = 65000
 holdBtc = True
 window = 50
 
@@ -493,8 +497,8 @@ print('y shape: ' + str(np.array(y).shape))
 b = [1.] + [0.] * (len(symbols) - 1)  
 pBeta = 0.5
 k = 15
-learningRate = 0.0001
-minibatchCount = 3
+learningRate = 0.005
+minibatchCount = 6
 minibatchSize = 4
 epochs = 10
 
