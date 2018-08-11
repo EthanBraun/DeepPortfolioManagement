@@ -389,8 +389,8 @@ def validateTimesteps(data):
 	timesteps = [x[0] for x in data]
 	for i, _ in enumerate(timesteps[:-1]):
 		if timesteps[i + 1] - timesteps[i] != 60000:
-			plt.plot(timesteps, color='r')
-			plt.show()
+			#plt.plot(timesteps, color='r')
+			#plt.show()
 			return False
 	return True
 
@@ -463,7 +463,7 @@ symbols = ['EOS/BTC', 'ETH/BTC', 'ETC/BTC', 'TRX/BTC', 'ICX/BTC', 'XRP/BTC', 'XL
 #depth = 210000
 depth = 110000
 #clip = 35000
-clip = 65000
+clip = 99000
 holdBtc = True
 window = 50
 
@@ -495,12 +495,12 @@ if holdBtc:
 print('\n\nx shape: ' + str(np.array(x).shape))
 print('y shape: ' + str(np.array(y).shape))
 b = [1.] + [0.] * (len(symbols) - 1)  
-pBeta = 0.5
+pBeta = 0.00005
 k = 15
-learningRate = 0.005
-minibatchCount = 6
-minibatchSize = 4
-epochs = 10
+learningRate = 0.00003
+minibatchCount = 30
+minibatchSize = 50
+epochs = 50
 
 port = Portfolio(symbols, b, pBeta, k, learningRate, minibatchCount, minibatchSize, epochs)
 port.createEiieNet(x, y)
