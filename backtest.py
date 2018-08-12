@@ -62,13 +62,36 @@ class Portfolio():
 		self.model = model
 		
 		# Instantiate custom symbolic gradient
-		#mu = K.placeholder(shape=(None, 1,))
-		#y = K.placeholder(shape=(None, len(self.symbols),))
-		mu = K.placeholder(shape=(1, ), name='mu')
-		y = K.placeholder(shape=(len(self.symbols),), name='y')
-		loss = -K.log(tf.multiply(mu, tf.tensordot(model.output, y, axes=1))) 
+		#mu = K.placeholder(shape=(1, ), name='mu')
+		#y = K.placeholder(shape=(len(self.symbols),), name='y')
+
+		mu = K.placeholder(shape=(None, 1), name='mu')
+		y = K.placeholder(shape=(None, len(self.symbols)), name='y')
+
+		#loss = -K.log(tf.multiply(mu, tf.tensordot(model.output, y, axes=1))) 
+
+		sqOut = K.squeeze(K.squeeze(model.output, 1), 1)
+
+		yOutMult = tf.multiply(sqOut, y)
+		yOutBatchDot = tf.reduce_sum(yOutMult, axis=1, keep_dims=True)
+		muDotMult = tf.multiply(mu, yOutBatchDot)		
+
+		loss = -K.log(muDotMult)
+
+		#loss = -K.log(tf.multiply(mu, tf.reduce_sum(tf.multiply(model.output, y), axis=1, keep_dims=True))) 
 		grad = K.gradients(loss, model.trainable_weights)
 		self.getGradient = K.function(inputs=[mIn, wIn, bIn, mu, y, model.output], outputs=grad) 
+		print('mIn shape: ' + str(mIn.get_shape().as_list()))
+		print('wIn shape: ' + str(wIn.get_shape().as_list()))
+		print('bIn shape: ' + str(bIn.get_shape().as_list()))
+		print('mu shape: ' + str(mu.get_shape().as_list()))
+		print('y shape: ' + str(y.get_shape().as_list()))
+		print('sqOut shape: ' + str(sqOut.get_shape().as_list()))
+		print('\nyOutMult shape: ' + str(yOutMult.get_shape().as_list()))
+		print('yOutBatchDot shape: ' + str(yOutBatchDot.get_shape().as_list()))
+		print('muDotMult shape: ' + str(muDotMult.get_shape().as_list()))
+		print('\nloss shape: ' + str(loss.get_shape().as_list()))
+		print('grad shape: ' + str([g.get_shape().as_list() for g in grad]))
 	
 	def printParams(self):
 		print('\nPortfolio parameters:')
@@ -168,22 +191,19 @@ class Portfolio():
 		#print('out shape: ' + str(out.shape))
 
 		#grad = [self.getGradient(inputs=[[mT], [wT], [bT], [muT], [yT], [oT]]) for (mT, wT, bT, muT, yT, oT) in zip(mIn, wIn, bIn, mu, yC, out)]  
-		grad = [self.getGradient(inputs=[[mT], [wT], [bT], muT, yT, [oT]]) for (mT, wT, bT, muT, yT, oT) in zip(mIn, wIn, bIn, mu, yC, out)]  
-		batchGrad = np.sum(grad, axis=0)
+		#grad = [self.getGradient(inputs=[[mT], [wT], [bT], muT, yT, [oT]]) for (mT, wT, bT, muT, yT, oT) in zip(mIn, wIn, bIn, mu, yC, out)]  
+		grad = self.getGradient(inputs=[mIn, wIn, bIn, mu, yC, out])  
+		#batchGrad = np.sum(grad, axis=0)
+		#print('Minibatch size: ' + str(self.minibatchSize))
+		#print('Gradient shape: ' + str(np.array(grad).shape)) 
 
 		#print('\n\n\t\t\tAFTER GET GRADIENT\n\n')
-		updates = [self.learningRate * g for g in batchGrad]
+		#updates = [self.learningRate * g for g in batchGrad]
+		updates = [self.learningRate * g for g in grad]
 		
 		modelWeights = self.model.get_weights()
+		#print('Model weights shape: ' + str(np.array(modelWeights).shape))
 		updateWeights = [np.add(wT, uT) for (wT, uT) in zip(modelWeights, updates)]
-		"""
-		print()
-		print()
-		print('updates shape: ' + str(np.array(updates).shape))
-		print('modelWeights shape: ' + str(np.array(modelWeights).shape))
-		print()
-		print()
-		"""
 		self.model.set_weights(updateWeights)
 
 	# RL agent training function
@@ -343,7 +363,7 @@ class Portfolio():
 
 				# Reset overall market-relative price vector
 				x = [1. for i in symbols]
-		print('\n\tFinal Weights: ' + str(np.array(self.getWeights())) + '\n') 
+		#print('\n\tFinal Weights: ' + str(np.array(self.getWeights())) + '\n') 
 		return self.getValue()
 
 	def getLabel(self, name):
