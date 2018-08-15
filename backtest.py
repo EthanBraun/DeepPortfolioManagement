@@ -34,10 +34,9 @@ class Portfolio():
 
 	# Instantiate fully-convolutional ensemble of identical independent evaluators
 	def createEiieNet(self, inputTensor, rates):
-		biasIn = np.ones(1)
 		mainInputShape = np.array(inputTensor).shape[1:]
 		weightInputShape = np.array(rates).shape[1:]
-		biasInputShape = biasIn.shape
+		biasInputShape = (1, )
 
 		mIn = Input(shape=mainInputShape, name='mainInput')
 		x = Conv2D(2, (3, 1))(mIn)
@@ -53,14 +52,13 @@ class Portfolio():
 		x = Concatenate(axis=3)([x, bInExp])
 		mOut = Activation('softmax')(x)
 	
-		model = Model([mIn, wIn, bIn], mOut) 
-		self.model = model
+		self.model = Model([mIn, wIn, bIn], mOut) 
 		
 		# Instantiate custom symbolic gradient
 		mu = K.placeholder(shape=(None, 1), name='mu')
 		y = K.placeholder(shape=(None, len(self.symbols)), name='y')
 
-		sqOut = K.squeeze(K.squeeze(model.output, 1), 1)
+		sqOut = K.squeeze(K.squeeze(self.model.output, 1), 1)
 
 		yOutMult = tf.multiply(sqOut, y)
 		yOutBatchDot = tf.reduce_sum(yOutMult, axis=1, keep_dims=True)
@@ -68,8 +66,8 @@ class Portfolio():
 
 		loss = -K.log(muDotMult)
 
-		grad = K.gradients(loss, model.trainable_weights)
-		self.getGradient = K.function(inputs=[mIn, wIn, bIn, mu, y, model.output], outputs=grad) 
+		grad = K.gradients(loss, self.model.trainable_weights)
+		self.getGradient = K.function(inputs=[mIn, wIn, bIn, mu, y, self.model.output], outputs=grad) 
 
 		print('mIn shape: ' + str(mIn.get_shape().as_list()))
 		print('wIn shape: ' + str(wIn.get_shape().as_list()))
@@ -373,7 +371,7 @@ if holdBtc:
 b = [1.] + [0.] * (len(symbols) - 1)  
 pBeta = 0.00005
 k = 15
-learningRate = 0.00003
+learningRate = 0.00019
 minibatchCount = 30
 minibatchSize = 50
 epochs = 50
