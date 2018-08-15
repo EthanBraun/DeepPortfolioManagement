@@ -54,7 +54,6 @@ class Portfolio():
 		mOut = Activation('softmax')(x)
 	
 		model = Model([mIn, wIn, bIn], mOut) 
-		model.compile(loss='mse', optimizer='nadam')
 		self.model = model
 		
 		# Instantiate custom symbolic gradient
